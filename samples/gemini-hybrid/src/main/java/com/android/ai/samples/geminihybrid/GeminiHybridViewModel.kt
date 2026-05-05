@@ -58,6 +58,7 @@ data class GeminiHybridUiState(
     val reviewText: String = "",
     val reviewInferenceStatus: Int? = null,
     val selectedLanguage: String = "Korean",
+    val selectedModelOption: OnDeviceModelOption = OnDeviceModelOption.STABLE,
     val status: GeminiStatus = GeminiStatus.Initial
 )
 
@@ -86,6 +87,10 @@ class GeminiHybridViewModel @Inject constructor() : ViewModel() {
 
     fun setInferenceMode(mode: InferenceMode) {
         _uiState.update { it.copy(selectedMode = mode) }
+    }
+
+    fun setModelOption(option: OnDeviceModelOption) {
+        _uiState.update { it.copy(selectedModelOption = option) }
     }
 
     fun toggleTag(tagResId: Int) {
@@ -133,7 +138,7 @@ class GeminiHybridViewModel @Inject constructor() : ViewModel() {
                         "gemini-2.5-flash-lite",
                         onDeviceConfig = OnDeviceConfig(
                             mode = _uiState.value.selectedMode,
-                            modelOption = OnDeviceModelOption.STABLE)
+                            modelOption = _uiState.value.selectedModelOption)
                     )
                 model.onDeviceExtension?.checkStatus()
                 model.generateContentStream(prompt).collect { chunk ->
