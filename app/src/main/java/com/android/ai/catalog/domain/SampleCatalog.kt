@@ -32,6 +32,7 @@ import com.android.ai.samples.genai_image_description.GenAIImageDescriptionScree
 import com.android.ai.samples.genai_summarization.GenAISummarizationScreen
 import com.android.ai.samples.genai_writing_assistance.GenAIWritingAssistanceScreen
 import com.android.ai.samples.geminihybrid.GeminiHybridScreen
+import com.android.ai.samples.geminihybridv4.GeminiHybridV4Screen
 import com.android.ai.samples.imagen.ui.ImagenScreen
 import com.android.ai.samples.imagenediting.ui.ImagenEditingScreen
 import com.android.ai.samples.magicselfie.ui.MagicSelfieScreen
@@ -50,6 +51,16 @@ val sampleCatalog = listOf(
         needsFirebase = true,
         keyArt = R.drawable.img_keyart_text,
         isFeatured = true,
+    ),
+    SampleCatalogItem(
+        title = R.string.gemini_hybrid_v4_sample_list_title,
+        description = R.string.gemini_hybrid_v4_sample_list_description,
+        route = "GeminiHybridV4Screen",
+        sampleEntryScreen = { GeminiHybridV4Screen() },
+        tags = listOf(SampleTags.GEMINI_NANO, SampleTags.GEMINI_FLASH, SampleTags.ML_KIT, SampleTags.FIREBASE),
+        needsFirebase = true,
+        keyArt = R.drawable.img_keyart_text,
+        isFeatured = false,
     ),
     SampleCatalogItem(
         title = R.string.gemini_image_chat_list_title,

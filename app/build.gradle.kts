@@ -94,6 +94,7 @@ dependencies {
     implementation(project(":samples:gemini-video-metadata-creation"))
     implementation(project(":samples:gemini-image-chat"))
     implementation(project(":samples:gemini-hybrid"))
+    implementation(project(":samples:gemini-hybrid-v4"))
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
