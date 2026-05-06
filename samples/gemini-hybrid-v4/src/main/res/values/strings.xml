@@ -6,4 +6,7 @@
     <string name="section_title">Scanned Receipts</string>
     <string name="no_expenses">No expenses yet. Scan a receipt to add one.</string>
     <string name="scan_receipt">Scan Receipt</string>
+    <string name="gemini_hybrid_option_stable">STABLE</string>
+    <string name="gemini_hybrid_option_preview">PREVIEW</string>
+    <string name="gemini_hybrid_option_preview_fast">PREVIEW FAST</string>
 </resources>

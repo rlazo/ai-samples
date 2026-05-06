@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:OptIn(PublicPreviewAPI::class)
+
 package com.android.ai.samples.geminihybridv4
 
 import android.graphics.Bitmap
@@ -37,6 +39,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
 import kotlinx.serialization.json.Json
 
 data class GeminiHybridV4UiState(
@@ -44,7 +47,8 @@ data class GeminiHybridV4UiState(
     val isScanning: Boolean = false,
     val modelStatus: String = "Checking model status...",
     val errorMessage: String? = null,
-    val receiptImageUri: String? = null
+    val receiptImageUri: String? = null,
+    val selectedModelOption: OnDeviceModelOption = OnDeviceModelOption.PREVIEW
 )
 
 @OptIn(PublicPreviewAPI::class)
@@ -55,19 +59,23 @@ class GeminiHybridV4ViewModel @Inject constructor() : ViewModel() {
     )
     val uiState: StateFlow<GeminiHybridV4UiState> = _uiState.asStateFlow()
 
-    private val model = Firebase.ai(backend = GenerativeBackend.googleAI()).generativeModel(
+    private fun getModel(option: OnDeviceModelOption) = Firebase.ai(backend = GenerativeBackend.googleAI()).generativeModel(
         modelName = "gemini-3.1-flash-lite-preview",
         onDeviceConfig = OnDeviceConfig(
             mode = InferenceMode.PREFER_ON_DEVICE,
-            modelOption = OnDeviceModelOption.PREVIEW)
+            modelOption = option)
     )
 
     init {
-        checkAndDownloadModel()
+        checkAndDownloadModel(_uiState.value.selectedModelOption)
     }
 
-    private fun checkAndDownloadModel() {
-        viewModelScope.launch {
+    private var downloadJob: Job? = null
+
+    private fun checkAndDownloadModel(option: OnDeviceModelOption) {
+        downloadJob?.cancel()
+        downloadJob = viewModelScope.launch {
+            val model = getModel(option)
             try {
                 val status = model.onDeviceExtension?.checkStatus() ?: return@launch
 
@@ -116,6 +124,13 @@ class GeminiHybridV4ViewModel @Inject constructor() : ViewModel() {
         _uiState.update { it.copy(modelStatus = statusText) }
     }
 
+    fun setModelOption(option: OnDeviceModelOption) {
+        if (_uiState.value.selectedModelOption != option) {
+            _uiState.update { it.copy(selectedModelOption = option) }
+            checkAndDownloadModel(option)
+        }
+    }
+
     fun scanReceipt(bitmap: Bitmap, uriString: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isScanning = true, errorMessage = null, receiptImageUri = uriString) }
@@ -135,6 +150,7 @@ class GeminiHybridV4ViewModel @Inject constructor() : ViewModel() {
                     )
                 }
 
+                val model = getModel(_uiState.value.selectedModelOption)
                 val response = model.generateContent(prompt)
                 val text = response.text
                 val inferenceMode = if (response.inferenceSource == InferenceSource.ON_DEVICE) {

@@ -89,6 +89,7 @@ import com.android.ai.theme.AISampleCatalogTheme
 import com.android.ai.theme.surfaceContainerHighestLight
 import com.android.ai.uicomponent.SampleDetailTopAppBar
 import com.google.firebase.ai.type.PublicPreviewAPI
+import com.google.firebase.ai.OnDeviceModelOption
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -218,6 +219,11 @@ fun GeminiHybridV4Screen(viewModel: GeminiHybridV4ViewModel = hiltViewModel()) {
                                     color = MaterialTheme.colorScheme.onSecondaryContainer
                                 )
                             }
+                            Spacer(modifier = Modifier.weight(1f))
+                            ModelOptionDropdown(
+                                selectedOption = uiState.selectedModelOption,
+                                onOptionSelected = viewModel::setModelOption
+                            )
                         }
                     }
 
@@ -420,4 +426,44 @@ private fun getTmpFileUri(context: Context): Uri {
         deleteOnExit()
     }
     return FileProvider.getUriForFile(context, "${context.packageName}.provider", tmpFile)
+}
+
+@Composable
+fun ModelOptionDropdown(
+    selectedOption: OnDeviceModelOption,
+    onOptionSelected: (OnDeviceModelOption) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val options = listOf(
+        OnDeviceModelOption.STABLE to stringResource(R.string.gemini_hybrid_option_stable),
+        OnDeviceModelOption.PREVIEW to stringResource(R.string.gemini_hybrid_option_preview),
+        OnDeviceModelOption.PREVIEW_FAST to stringResource(R.string.gemini_hybrid_option_preview_fast),
+    )
+    val selectedText = options.find { it.first == selectedOption }?.second ?: ""
+
+    Box(modifier = modifier) {
+        TextButton(onClick = { expanded = true }) {
+            Text(selectedText)
+            Spacer(modifier = Modifier.width(4.dp))
+            Icon(
+                imageVector = Icons.Default.ArrowDropDown,
+                contentDescription = null
+            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            options.forEach { (option, label) ->
+                DropdownMenuItem(
+                    text = { Text(label) },
+                    onClick = {
+                        onOptionSelected(option)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
 }
