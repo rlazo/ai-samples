@@ -15,17 +15,21 @@
  */
 package com.android.ai.samples.geminihybridv4
 
+import android.graphics.Bitmap
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.Firebase
+import com.google.firebase.ai.DownloadStatus
 import com.google.firebase.ai.InferenceMode
 import com.google.firebase.ai.InferenceSource
 import com.google.firebase.ai.OnDeviceConfig
 import com.google.firebase.ai.OnDeviceModelOption
+import com.google.firebase.ai.OnDeviceModelStatus
 import com.google.firebase.ai.ai
 import com.google.firebase.ai.type.GenerativeBackend
 import com.google.firebase.ai.type.PublicPreviewAPI
+import com.google.firebase.ai.type.content
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,228 +37,135 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 
-sealed interface GeminiStatus {
-    data object Initial : GeminiStatus
-    data class Generating(
-        val isCloud: Boolean,
-        val partialOutput: String = "",
-        val isTranslation: Boolean = false
-    ) : GeminiStatus
-
-    data class Success(
-        val output: String,
-        val isCloud: Boolean,
-        val isTranslation: Boolean = false
-    ) : GeminiStatus
-
-    data class Error(val message: String) : GeminiStatus
-}
-
-@OptIn(PublicPreviewAPI::class)
-data class GeminiHybridUiState(
-    val selectedMode: InferenceMode = InferenceMode.ONLY_ON_DEVICE,
-    val selectedTags: List<Int> = emptyList(),
-    val reviewText: String = "",
-    val reviewInferenceStatus: Int? = null,
-    val selectedLanguage: String = "Korean",
-    val selectedModelOption: OnDeviceModelOption = OnDeviceModelOption.STABLE,
-    val status: GeminiStatus = GeminiStatus.Initial
+data class GeminiHybridV4UiState(
+    val expense: Expense? = null,
+    val isScanning: Boolean = false,
+    val modelStatus: String = "Checking model status...",
+    val errorMessage: String? = null,
+    val receiptImageUri: String? = null
 )
 
-@PublicPreviewAPI
+@OptIn(PublicPreviewAPI::class)
 @HiltViewModel
 class GeminiHybridV4ViewModel @Inject constructor() : ViewModel() {
-    private val _uiState = MutableStateFlow(GeminiHybridUiState())
-    val uiState: StateFlow<GeminiHybridUiState> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(
+        GeminiHybridV4UiState()
+    )
+    val uiState: StateFlow<GeminiHybridV4UiState> = _uiState.asStateFlow()
 
-    val tags = listOf(
-        R.string.location,
-        R.string.view,
-        R.string.service,
-        R.string.comfort,
-        R.string.food,
-        R.string.spacious,
-        R.string.natural_light,
+    private val model = Firebase.ai(backend = GenerativeBackend.googleAI()).generativeModel(
+        modelName = "gemini-3.1-flash-lite-preview",
+        onDeviceConfig = OnDeviceConfig(
+            mode = InferenceMode.PREFER_ON_DEVICE,
+            modelOption = OnDeviceModelOption.PREVIEW)
     )
 
-    val languageMap = mapOf(
-        "Korean" to R.string.gemini_hybrid_lang_korean,
-        "Spanish" to R.string.gemini_hybrid_lang_spanish,
-        "French" to R.string.gemini_hybrid_lang_french,
-        "German" to R.string.gemini_hybrid_lang_german
-    )
-
-    fun setInferenceMode(mode: InferenceMode) {
-        _uiState.update { it.copy(selectedMode = mode) }
+    init {
+        checkAndDownloadModel()
     }
 
-    fun setModelOption(option: OnDeviceModelOption) {
-        _uiState.update { it.copy(selectedModelOption = option) }
-    }
-
-    fun toggleTag(tagResId: Int) {
-        _uiState.update { state ->
-            val newTags = if (state.selectedTags.contains(tagResId)) {
-                state.selectedTags - tagResId
-            } else {
-                state.selectedTags + tagResId
-            }
-            state.copy(selectedTags = newTags)
-        }
-    }
-
-    fun updateReviewText(text: String) {
-        _uiState.update { it.copy(reviewText = text) }
-    }
-
-    fun setSelectedLanguage(language: String) {
-        _uiState.update { it.copy(selectedLanguage = language) }
-    }
-
-    fun generateReview(tagStrings: List<String>) {
-        if (tagStrings.isEmpty()) {
-            _uiState.update { it.copy(status = GeminiStatus.Error("Please select at least one tag")) }
-            return
-        }
-
+    private fun checkAndDownloadModel() {
         viewModelScope.launch {
-            _uiState.update {
-                it.copy(
-                    status = GeminiStatus.Generating(
-                        isCloud = it.selectedMode == InferenceMode.ONLY_IN_CLOUD,
-                        isTranslation = false
-                    )
-                )
-            }
             try {
-                val prompt =
-                    "Write a simple, short and generic hotel review positively covering the following themes: ${
-                        tagStrings.joinToString(", ")
-                    }. Generate a generic review strictly from themes, don't hallucinate a hotel name or a location. Return only the review text."
+                val status = model.onDeviceExtension?.checkStatus() ?: return@launch
 
-                val model = Firebase.ai(backend = GenerativeBackend.googleAI())
-                    .generativeModel(
-                        "gemini-2.5-flash-lite",
-                        onDeviceConfig = OnDeviceConfig(
-                            mode = _uiState.value.selectedMode,
-                            modelOption = _uiState.value.selectedModelOption)
-                    )
-                model.onDeviceExtension?.checkStatus()
-                model.generateContentStream(prompt).collect { chunk ->
-                    val isCloud = chunk.inferenceSource == InferenceSource.IN_CLOUD
-                    _uiState.update { state ->
-                        val currentStatus = state.status
-                        val newStatus = if (currentStatus is GeminiStatus.Generating) {
-                            currentStatus.copy(
-                                isCloud = isCloud,
-                                partialOutput = currentStatus.partialOutput + (chunk.text ?: "")
-                            )
-                        } else {
-                            GeminiStatus.Generating(
-                                isCloud = isCloud,
-                                partialOutput = chunk.text ?: "",
-                                isTranslation = false
-                            )
+                updateStatus(status)
+
+                if (status == OnDeviceModelStatus.DOWNLOADABLE) {
+                    model.onDeviceExtension?.download()?.collect { downloadStatus ->
+                        when (downloadStatus) {
+                            is DownloadStatus.DownloadStarted -> {
+                                _uiState.update { it.copy(modelStatus = "Downloading model...") }
+                            }
+
+                            is DownloadStatus.DownloadInProgress -> {
+                                val progress = downloadStatus.totalBytesDownloaded
+                                _uiState.update { it.copy(modelStatus = "Downloading: $progress bytes downloaded") }
+                            }
+
+                            is DownloadStatus.DownloadCompleted -> {
+                                _uiState.update { it.copy(modelStatus = "Model ready") }
+                            }
+
+                            is DownloadStatus.DownloadFailed -> {
+                                _uiState.update {
+                                    it.copy(
+                                        modelStatus = "Download failed", errorMessage = "Model download failed"
+                                    )
+                                }
+                            }
                         }
-                        state.copy(status = newStatus)
-                    }
-                }
-
-                val finalState = _uiState.value
-                val finalStatus = finalState.status
-                if (finalStatus is GeminiStatus.Generating) {
-                    val output = finalStatus.partialOutput.trimEnd()
-                    val inferenceStatusResId = if (finalStatus.isCloud) {
-                        R.string.gemini_hybrid_generated_cloud
-                    } else {
-                        R.string.gemini_hybrid_generated_on_device
-                    }
-                    _uiState.update {
-                        it.copy(
-                            reviewText = output,
-                            reviewInferenceStatus = inferenceStatusResId,
-                            status = GeminiStatus.Success(output, finalStatus.isCloud, isTranslation = false)
-                        )
                     }
                 }
             } catch (e: Exception) {
-                Log.e("GeminiHybrid", "Inference failed", e)
-                _uiState.update {
-                    it.copy(status = GeminiStatus.Error(e.localizedMessage ?: "Unknown error occurred"))
-                }
+                _uiState.update { it.copy(modelStatus = "Error checking status", errorMessage = e.message) }
             }
         }
     }
 
-    fun translate(text: String, language: String) {
-        if (text.isBlank()) {
-            _uiState.update { it.copy(status = GeminiStatus.Error("Text to translate cannot be empty")) }
-            return
+    private fun updateStatus(status: OnDeviceModelStatus) {
+        val statusText = when (status) {
+            OnDeviceModelStatus.AVAILABLE -> "Model available"
+            OnDeviceModelStatus.DOWNLOADABLE -> "Model downloadable"
+            OnDeviceModelStatus.DOWNLOADING -> "Model downloading..."
+            OnDeviceModelStatus.UNAVAILABLE -> "On-device model unavailable"
+            else -> "Unknown"
         }
+        _uiState.update { it.copy(modelStatus = statusText) }
+    }
 
+    fun scanReceipt(bitmap: Bitmap, uriString: String) {
         viewModelScope.launch {
-            _uiState.update {
-                it.copy(
-                    status = GeminiStatus.Generating(
-                        isCloud = it.selectedMode == InferenceMode.ONLY_IN_CLOUD,
-                        isTranslation = true
-                    )
-                )
-            }
+            _uiState.update { it.copy(isScanning = true, errorMessage = null, receiptImageUri = uriString) }
             try {
-                val prompt =
-                    "Translate the following text to $language. Return ONLY the translated text, no explanations:\n\n$text"
-
-                val model = Firebase.ai(backend = GenerativeBackend.googleAI())
-                    .generativeModel(
-                        "gemini-2.5-flash-lite",
-                        onDeviceConfig = OnDeviceConfig(mode = _uiState.value.selectedMode)
+                val prompt = content {
+                    image(bitmap)
+                    text(
+                        """
+                        Extract the store name and the total price from this receipt. Store names are usually at the top of the document, first thing in them. Total price is usually indicated by text like "Total" or "Total Due"
+                        Output only in JSON format containg 2 fields '{name,price}'.
+                        Do not include any currency signs or backticks or any text around it.
+                        Use dots for decimals.
+                        Examples:
+                        - {"name": "FakeStore", "price": "2.0"}
+                        - {"name": "SomeMarket", "price": "3.5"}
+                        """.trimIndent()
                     )
-
-                model.generateContentStream(prompt).collect { chunk ->
-                    val isCloud = chunk.inferenceSource == InferenceSource.IN_CLOUD
-                    _uiState.update { state ->
-                        val currentStatus = state.status
-                        val newStatus = if (currentStatus is GeminiStatus.Generating) {
-                            currentStatus.copy(
-                                isCloud = isCloud,
-                                partialOutput = currentStatus.partialOutput + (chunk.text ?: "")
-                            )
-                        } else {
-                            GeminiStatus.Generating(
-                                isCloud = isCloud,
-                                partialOutput = chunk.text ?: "",
-                                isTranslation = true
-                            )
-                        }
-                        state.copy(status = newStatus)
-                    }
                 }
 
-                val finalState = _uiState.value
-                val finalStatus = finalState.status
-                if (finalStatus is GeminiStatus.Generating) {
-                    _uiState.update {
-                        it.copy(
-                            status = GeminiStatus.Success(
-                                finalStatus.partialOutput,
-                                finalStatus.isCloud,
-                                isTranslation = true
-                            )
-                        )
-                    }
+                val response = model.generateContent(prompt)
+                val text = response.text
+                val inferenceMode = if (response.inferenceSource == InferenceSource.ON_DEVICE) {
+                    "On-device"
+                } else {
+                    "Cloud"
+                }
+                Log.d("HybridVM", "$inferenceMode response: $text")
+                if (text != null) {
+                    parseAndAddExpense(text, inferenceMode)
+                } else {
+                    _uiState.update { it.copy(errorMessage = "Could not extract data") }
                 }
             } catch (e: Exception) {
-                Log.e("GeminiHybrid", "Inference failed", e)
-                _uiState.update {
-                    it.copy(status = GeminiStatus.Error(e.localizedMessage ?: "Unknown error occurred"))
-                }
+                _uiState.update { it.copy(errorMessage = "Error: ${e.message}") }
+            } finally {
+                _uiState.update { it.copy(isScanning = false) }
             }
         }
     }
 
-    fun reset() {
-        _uiState.value = GeminiHybridUiState()
+    private fun parseAndAddExpense(text: String, inferenceMode: String) {
+        val json = text
+            // The on-device model sometimes outputs backticks, so we remove those
+            .replace("```json", "")
+            .replace("```", "")
+        try {
+            val newExpense = Json.decodeFromString<Expense>(json).copy(inferenceMode = inferenceMode)
+            _uiState.update { it.copy(expense = newExpense) }
+        } catch (e: Exception) {
+            _uiState.update { it.copy(errorMessage = e.localizedMessage) }
+        }
     }
 }
