@@ -29,6 +29,8 @@
     <string name="gemini_image_chat_list_description">Conversational Image generation with Gemini 3 Pro Image</string>
     <string name="gemini_hybrid_sample_list_title">Gemini Hybrid</string>
     <string name="gemini_hybrid_sample_list_description">Inference with Firebase Hybrid SDK using either Gemini Nano on-device or Gemini Flash in the Cloud.</string>
+    <string name="gemini_hybrid_v4_sample_list_title">Gemini Hybrid v4</string>
+    <string name="gemini_hybrid_v4_sample_list_description">Inference with Firebase Hybrid SDK (nano v4 version).</string>
     <string name="firebase_required">Firebase Required</string>
     <string name="firebase_required_description">This feature requires Firebase to be initialized.</string>
     <string name="close">Close</string>

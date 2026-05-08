@@ -25,4 +25,7 @@
     <string name="spacious">SPACIOUS</string>
     <string name="natural_light">NATURAL LIGHT</string>
     <string name="select_topics_for_your_review">Select topics for your review:</string>
+    <string name="gemini_hybrid_option_stable">STABLE</string>
+    <string name="gemini_hybrid_option_preview">PREVIEW</string>
+    <string name="gemini_hybrid_option_preview_fast">PREVIEW FAST</string>
 </resources>
