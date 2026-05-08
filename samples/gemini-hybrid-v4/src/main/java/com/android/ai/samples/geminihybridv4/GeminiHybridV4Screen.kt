@@ -55,6 +55,8 @@ import androidx.compose.ui.window.Dialog
 import android.graphics.Bitmap
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
@@ -90,6 +92,8 @@ import com.android.ai.theme.surfaceContainerHighestLight
 import com.android.ai.uicomponent.SampleDetailTopAppBar
 import com.google.firebase.ai.type.PublicPreviewAPI
 import com.google.firebase.ai.OnDeviceModelOption
+import com.google.firebase.ai.type.Content
+import com.google.firebase.ai.type.asTextOrNull
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -344,11 +348,26 @@ fun ExpenseResultUi(
             }
 
             if (expense.inferenceMode.isNotEmpty()) {
-                Text(
-                    text = "Extracted via ${expense.inferenceMode}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.Gray
-                )
+                val isCloud = expense.inferenceMode.equals("Cloud", ignoreCase = true)
+                val icon = if (isCloud) Icons.Default.Cloud else Icons.Default.Smartphone
+                val tint = if (isCloud) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.tertiary
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = tint,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = "Extracted via ${expense.inferenceMode}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = tint
+                    )
+                }
             }
 
             if (hasImage) {

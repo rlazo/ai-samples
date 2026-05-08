@@ -60,9 +60,9 @@ class GeminiHybridV4ViewModel @Inject constructor() : ViewModel() {
     val uiState: StateFlow<GeminiHybridV4UiState> = _uiState.asStateFlow()
 
     private fun getModel(option: OnDeviceModelOption) = Firebase.ai(backend = GenerativeBackend.googleAI()).generativeModel(
-        modelName = "gemini-3.1-flash-lite-preview",
+        modelName = "gemini-3.1-flash-lite",
         onDeviceConfig = OnDeviceConfig(
-            mode = InferenceMode.PREFER_ON_DEVICE,
+            mode = InferenceMode.PREFER_IN_CLOUD,
             modelOption = option)
     )
 
